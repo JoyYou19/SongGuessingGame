@@ -92,6 +92,13 @@ export default function SongGame() {
     }
   };
 
+  function extractPlaylistId(input: string): string | null {
+    const match = input.match(
+      /(?:playlist\/|spotify:playlist:)([a-zA-Z0-9]+)(?:\?|$)/,
+    );
+    return match ? match[1] : null;
+  }
+
   useEffect(() => {
     fetchTrack();
   }, []);
@@ -104,8 +111,12 @@ export default function SongGame() {
           <div className="flex flex-col items-end gap-2">
             <input
               value={playlistId}
-              onChange={(e) => setPlaylistId(e.target.value)}
-              placeholder="Playlist ID"
+              onChange={(e) => {
+                const rawInput = e.target.value;
+                const extractedId = extractPlaylistId(rawInput);
+                setPlaylistId(extractedId ?? rawInput); // fallback to raw if regex fails
+              }}
+              placeholder="Paste Spotify link or ID"
               className="px-4 py-2 rounded-md bg-neutral-800 text-white border border-neutral-700 focus:ring-2 focus:ring-[#1DB954] outline-none w-64"
             />
             <button
