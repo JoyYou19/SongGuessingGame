@@ -75,7 +75,7 @@ export async function getRandomPreview(
       "fields",
       "items(track(preview_url,name,artists)),next",
     );
-    url.searchParams.set("limit", "50");
+    url.searchParams.set("limit", "1000");
 
     console.log("Making request to:", url.toString());
     const response = await fetch(url.toString(), {
