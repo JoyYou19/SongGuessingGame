@@ -136,17 +136,30 @@ export async function getRandomPreview(
     throw error;
   }
 }
+// Define the expected shape of the result from spotifyPreviewFinder
+interface PreviewFinderResult {
+  success: boolean;
+  results: Array<{
+    previewUrls: string[];
+    // Add more fields here if needed
+  }>;
+}
 
 async function getPreviewFromName(trackName: string): Promise<string | null> {
   try {
-    const result = await spotifyPreviewFinder(trackName, 1);
+    // Explicitly cast the result type
+    const result = (await spotifyPreviewFinder(
+      trackName,
+      1,
+    )) as PreviewFinderResult;
+
     if (result.success && result.results.length > 0) {
-      // Return the first preview url found
-      return result.results[0].previewUrls[0] || null;
+      const firstPreview = result.results[0].previewUrls[0];
+      return firstPreview ?? null;
     }
     return null;
-  } catch (e) {
-    console.error("Preview finder error:", e);
+  } catch (error) {
+    console.error("Preview finder error:", error);
     return null;
   }
 }
