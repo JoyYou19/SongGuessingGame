@@ -178,7 +178,7 @@ export default function SongGame() {
           </p>
 
           {/* Dark themed Combobox */}
-          <Combobox value={guess} onChange={setGuess}>
+          <Combobox value={guess} onChange={(val) => setGuess(val ?? "")}>
             <div className="relative flex w-full gap-4">
               <Combobox.Input
                 className="flex-1 px-4 py-3 rounded-md border border-neutral-700 bg-neutral-800 text-white text-lg font-medium outline-none focus:ring-2 focus:ring-[#1DB954]"
