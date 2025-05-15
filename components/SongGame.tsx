@@ -64,13 +64,6 @@ export default function SongGame() {
     }
   };
 
-  const onAudioPlay = () => {
-    clearTimeoutIfAny();
-    timeoutRef.current = setTimeout(() => {
-      audioRef.current?.pause();
-    }, seconds * 1000);
-  };
-
   // Clean up on unmount or when seconds change
   useEffect(() => {
     return () => clearTimeoutIfAny();

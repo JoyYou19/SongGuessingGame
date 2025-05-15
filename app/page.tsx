@@ -1,5 +1,4 @@
 import SongGame from "@/components/SongGame";
-import Image from "next/image";
 
 export default function Home() {
   return (
