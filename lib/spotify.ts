@@ -1,5 +1,6 @@
 import { Track, TrackSummary } from "spotify";
 import spotifyPreviewFinder from "spotify-preview-finder";
+import { JSDOM } from "jsdom";
 
 type SpotifyTokenResponse = {
   access_token: string;
@@ -123,8 +124,9 @@ export async function getRandomPreview(
   try {
     // Check cache first
     let cached = playlistCache.get(playlistId);
+
+    const token = await getSpotifyAccessToken(clientId, clientSecret);
     if (!cached || cached.expires < Date.now()) {
-      const token = await getSpotifyAccessToken(clientId, clientSecret);
       const allTracks = await fetchAllPlaylistTracks(token, playlistId);
 
       playlistCache.set(playlistId, {
@@ -147,6 +149,19 @@ export async function getRandomPreview(
       let previewUrl = randomTrack.previewUrl;
 
       // If no Spotify preview, use the preview finder
+      if (!previewUrl) {
+        previewUrl = await getSpotifyPreviewUrl(randomTrack.id);
+      }
+
+      // If no Spotify preview, use the preview finder
+      if (!previewUrl) {
+        previewUrl = await getPreviewFromTrackId(randomTrack.id, token);
+      }
+
+      if (!previewUrl) {
+        previewUrl = await getPreviewFromTrackUrl(randomTrack.id);
+      }
+
       if (!previewUrl) {
         previewUrl = await getPreviewFromName(randomTrack.name);
       }
@@ -211,6 +226,48 @@ async function getPreviewFromName(trackName: string): Promise<string | null> {
   }
 }
 
+async function getPreviewFromTrackId(
+  trackId: string,
+  token: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `https://api.spotify.com/v1/tracks/${trackId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+
+    if (!response.ok) {
+      console.error(`Failed to fetch track ${trackId}: ${response.status}`);
+      return null;
+    }
+
+    const track = await response.json();
+    return track.preview_url || null;
+  } catch (error) {
+    console.error(`Error fetching track ${trackId}:`, error);
+    return null;
+  }
+}
+
+async function getPreviewFromTrackUrl(trackId: string): Promise<string | null> {
+  try {
+    const trackUrl = `https://open.spotify.com/track/${trackId}`;
+    const response = await fetch(trackUrl);
+    const html = await response.text();
+
+    // Parse the HTML to find preview URLs
+    const previewUrlRegex = /"preview_url":"([^"]+)"/;
+    const match = html.match(previewUrlRegex);
+
+    return match ? match[1] : null;
+  } catch (error) {
+    console.error(`Failed to scrape preview for track ${trackId}:`, error);
+    return null;
+  }
+}
+
 export function getSpotifyEmbed(
   trackId: string,
   width: number = 400,
@@ -225,4 +282,81 @@ export function getSpotifyEmbed(
 // Or if you need just the embed URL:
 export function getSpotifyEmbedUrl(trackId: string): string {
   return `https://open.spotify.com/embed/track/${trackId}`;
+}
+
+async function getSpotifyPreviewUrl(trackId: string): Promise<string | null> {
+  try {
+    const trackUrl = `https://open.spotify.com/track/${trackId}`;
+
+    // Fetch the track page
+    const response = await fetch(trackUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const html = await response.text();
+
+    // Parse the HTML with JSDOM
+    const dom = new JSDOM(html);
+    const document = dom.window.document;
+
+    // Look for the preview URL in the page metadata
+    const previewUrl = findPreviewUrlInDocument(document);
+
+    if (!previewUrl) {
+      throw new Error("Preview URL not found in page");
+    }
+
+    return previewUrl;
+  } catch (error) {
+    console.error(`Failed to fetch preview for track ${trackId}:`, error);
+    return null;
+  }
+}
+
+function findPreviewUrlInDocument(document: Document): string | null {
+  // Method 1: Check meta tags
+  const metaTags = document.querySelectorAll("meta");
+  for (const tag of metaTags) {
+    if (
+      tag.getAttribute("property") === "og:audio" ||
+      tag.getAttribute("name") === "preview_url"
+    ) {
+      return tag.getAttribute("content");
+    }
+  }
+
+  // Method 2: Check script tags for JSON data
+  const scripts = document.querySelectorAll(
+    'script[type="application/ld+json"]',
+  );
+  for (const script of scripts) {
+    try {
+      const json = JSON.parse(script.textContent || "");
+      if (json?.previewUrl) {
+        return json.previewUrl;
+      }
+    } catch (e) {
+      console.log(e);
+      continue;
+    }
+  }
+
+  // Method 3: Search for p.scdn.co links in attributes
+  const elements = document.querySelectorAll("*");
+  for (const element of elements) {
+    for (const attr of element.attributes) {
+      if (attr.value.includes("p.scdn.co")) {
+        return attr.value;
+      }
+    }
+  }
+
+  return null;
 }
