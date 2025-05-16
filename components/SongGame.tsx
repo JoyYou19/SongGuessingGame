@@ -42,7 +42,7 @@ export default function SongGame() {
   const [showEmbed, setShowEmbed] = useState(false);
 
   const [query, setQuery] = useState("");
-  const [skipStep, setSkipStep] = useState(0.7);
+  const [skipStep, setSkipStep] = useState(0.4);
 
   const skipSeconds = () => {
     setSeconds((prev) => {
@@ -51,8 +51,10 @@ export default function SongGame() {
     });
 
     setSkipStep((prevStep) => {
-      if (seconds < 1) return 1; // After 0.3 + 0.7, set to +1
-      if (prevStep >= 8) return 8; // Cap at +8
+      if (seconds < 0.5) return 0.5;
+      if (seconds < 1) return 2; // After 0.3 + 0.7, set to +1
+      if (seconds < 3) return 4;
+      if (seconds >= 7) return 15;
       return prevStep * 2; // Double the step each time
     });
   };
@@ -114,11 +116,11 @@ export default function SongGame() {
       }
       const data = await res.json();
       setTrack(data);
-      setSeconds(0.3);
+      setSeconds(0.1);
       setGuess("");
       setMessage("");
       setIsPlaying(false);
-      setSkipStep(0.7); // reset for new track
+      setSkipStep(0.4); // reset for new track
       setCurrentTime(0);
     } catch (error) {
       const errorMessage =
@@ -267,7 +269,7 @@ export default function SongGame() {
               />
 
               {/* Segment markers */}
-              {([0.3, 1, 2, 4, 8, 16, 24] as const).map((time, index) => (
+              {([0.1, 0.5, 1, 3, 7, 15] as const).map((time, index) => (
                 <div
                   key={index}
                   className="absolute top-0 bottom-0 w-px bg-neutral-600 opacity-60"
