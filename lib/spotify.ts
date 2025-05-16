@@ -214,7 +214,7 @@ async function getPreviewFromName(trackName: string): Promise<string | null> {
 export function getSpotifyEmbed(
   trackId: string,
   width: number = 400,
-  height: number = 400,
+  height: number = 300,
 ): string {
   console.log("This is the trackid: ", trackId);
   return `
