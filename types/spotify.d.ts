@@ -2,9 +2,16 @@ declare module "spotify" {
   export interface Artist {
     name: string;
   }
+  export interface TrackSummary {
+    id: string;
+    name: string;
+    artist: string;
+    previewUrl: string | null;
+  }
 
   export interface Track {
-    preview_url: string;
+    id: string;
+    preview_url: string | null;
     name: string;
     artists: Artist[];
   }

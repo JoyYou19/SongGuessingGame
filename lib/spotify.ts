@@ -1,3 +1,4 @@
+import { Track, TrackSummary } from "spotify";
 import spotifyPreviewFinder from "spotify-preview-finder";
 
 type SpotifyTokenResponse = {
@@ -5,16 +6,6 @@ type SpotifyTokenResponse = {
   token_type: string;
   expires_in: number;
 };
-
-export interface Artist {
-  name: string;
-}
-
-export interface Track {
-  preview_url: string | null;
-  name: string;
-  artists: Artist[];
-}
 
 export interface PlaylistTrackItem {
   track: Track | null;
@@ -25,12 +16,29 @@ export interface PlaylistTracksResponse {
   next: string | null;
 }
 
-type TrackSummary = { name: string; artist: string };
+interface PlaylistCache {
+  tracks: TrackSummary[];
+  expires: number;
+}
+
+const playlistCache = new Map<string, PlaylistCache>();
+const CACHE_TTL = 5 * 60 * 1000;
+
+let cachedToken: {
+  token: string;
+  expires: number;
+} | null = null;
+const TOKEN_TTL = 55 * 60 * 1000;
 
 export async function getSpotifyAccessToken(
   clientId: string,
   clientSecret: string,
 ): Promise<string> {
+  // Check if we have a token in the cache already
+  if (cachedToken && cachedToken.expires > Date.now()) {
+    return cachedToken.token;
+  }
+
   const resp = await fetch("https://accounts.spotify.com/api/token", {
     method: "POST",
     headers: {
@@ -48,7 +56,54 @@ export async function getSpotifyAccessToken(
   }
 
   const data: SpotifyTokenResponse = await resp.json();
+
+  cachedToken = {
+    token: data.access_token,
+    expires: Date.now() + TOKEN_TTL,
+  };
   return data.access_token;
+}
+
+async function fetchAllPlaylistTracks(
+  token: string,
+  playlistId: string,
+): Promise<TrackSummary[]> {
+  let url = `https://api.spotify.com/v1/playlists/${playlistId}/tracks`;
+  const params = new URLSearchParams({
+    fields: "items(track(id,preview_url,name,artists)),next",
+    limit: "100",
+  });
+  url += `?${params}`;
+
+  const allTracks: TrackSummary[] = [];
+
+  while (url) {
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`API Error: ${response.status} ${errorBody}`);
+    }
+
+    const data: PlaylistTracksResponse = await response.json();
+
+    const tracks = data.items
+      .map((item) => item.track)
+      .filter((track): track is Track => track !== null)
+      .map((track) => ({
+        id: track.id,
+        name: track.name,
+        artist: track.artists.map((a) => a.name).join(", "),
+        previewUrl: track.preview_url,
+      }));
+
+    allTracks.push(...tracks);
+    url = data.next || "";
+  }
+
+  return allTracks;
 }
 
 export async function getRandomPreview(
@@ -59,107 +114,115 @@ export async function getRandomPreview(
   previewUrl: string;
   name: string;
   artist: string;
+  trackId: string;
   allTracks: TrackSummary[];
+  embedHtml: string;
 }> {
   console.log(`Starting track fetch for playlist: ${playlistId}`);
 
   try {
-    const token = await getSpotifyAccessToken(clientId, clientSecret);
-    console.log("Successfully obtained access token");
+    // Check cache first
+    let cached = playlistCache.get(playlistId);
+    if (!cached || cached.expires < Date.now()) {
+      const token = await getSpotifyAccessToken(clientId, clientSecret);
+      const allTracks = await fetchAllPlaylistTracks(token, playlistId);
 
-    const url = new URL(
-      `https://api.spotify.com/v1/playlists/${playlistId}/tracks`,
-    );
-    url.searchParams.set("market", "US");
-    url.searchParams.set(
-      "fields",
-      "items(track(preview_url,name,artists)),next",
-    );
-    url.searchParams.set("limit", "100");
-
-    console.log("Making request to:", url.toString());
-    const response = await fetch(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("API request failed:", {
-        status: response.status,
-        errorBody,
+      playlistCache.set(playlistId, {
+        tracks: allTracks,
+        expires: Date.now() + CACHE_TTL,
       });
-      throw new Error(`API Error: ${response.status} ${errorBody}`);
+      cached = { tracks: allTracks, expires: Date.now() + CACHE_TTL };
     }
 
-    const data = (await response.json()) as PlaylistTracksResponse;
-    console.log("API Response - Total items:", data.items.length);
+    const { tracks: allTracks } = cached;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 5;
 
-    // Debug: Log first 5 tracks and their preview status
-    data.items.slice(0, 5).forEach((item, index) => {
-      console.log(`Track ${index + 1}:`, {
-        name: item.track?.name || "Unknown",
-        hasPreview: !!item.track?.preview_url,
-        previewUrl: item.track?.preview_url || "None",
-      });
-    });
-    const tracks = data.items
-      .map((item) => item.track)
-      .filter((track): track is Track => track !== null);
+    while (attempts < MAX_ATTEMPTS) {
+      // Pick random track
+      const randomTrack =
+        allTracks[Math.floor(Math.random() * allTracks.length)];
 
-    if (tracks.length === 0) {
-      throw new Error("No tracks found in the playlist");
+      // Try to get preview URL
+      let previewUrl = randomTrack.previewUrl;
+
+      // If no Spotify preview, use the preview finder
+      if (!previewUrl) {
+        previewUrl = await getPreviewFromName(randomTrack.name);
+      }
+
+      if (previewUrl) {
+        return {
+          previewUrl,
+          name: randomTrack.name,
+          artist: randomTrack.artist,
+          trackId: randomTrack.id,
+          allTracks,
+          embedHtml: getSpotifyEmbed(randomTrack.id),
+        };
+      }
+
+      attempts++;
+      console.warn(
+        `No preview found for ${randomTrack.name}, attempt ${attempts}/${MAX_ATTEMPTS}`,
+      );
     }
 
-    const allTracks = tracks.map((track) => ({
-      name: track.name,
-      artist: track.artists.map((a) => a.name).join(", "),
-    }));
-
-    // Pick one random track
-    const randomTrack = tracks[Math.floor(Math.random() * tracks.length)];
-
-    // Fetch preview URL from spotify-preview-finder for that track name
-    const previewUrl = await getPreviewFromName(randomTrack.name);
-
-    if (!previewUrl) {
-      throw new Error(`No preview found for track: ${randomTrack.name}`);
-    }
-
-    return {
-      previewUrl,
-      name: randomTrack.name,
-      artist: randomTrack.artists.map((a) => a.name).join(", "),
-      allTracks,
-    };
+    throw new Error(`Could not find preview after ${MAX_ATTEMPTS} attempts`);
   } catch (error) {
     console.error("Full error details:", error);
     throw error;
   }
 }
-// Define the expected shape of the result from spotifyPreviewFinder
-interface PreviewFinderResult {
-  success: boolean;
-  results: Array<{
-    previewUrls: string[];
-    // Add more fields here if needed
-  }>;
-}
+
+const previewFinderCache = new Map<string, string>();
+const RATE_LIMIT = 100; // 1 second between calls
+
+let lastCall = 0;
 
 async function getPreviewFromName(trackName: string): Promise<string | null> {
-  try {
-    // Explicitly cast the result type
-    const result = (await spotifyPreviewFinder(
-      trackName,
-      1,
-    )) as PreviewFinderResult;
+  // Check cache first
+  const cached = previewFinderCache.get(trackName);
+  if (cached) return cached;
 
-    if (result.success && result.results.length > 0) {
-      const firstPreview = result.results[0].previewUrls[0];
-      return firstPreview ?? null;
+  // Rate limit
+  const now = Date.now();
+  if (now - lastCall < RATE_LIMIT) {
+    await new Promise((resolve) =>
+      setTimeout(resolve, RATE_LIMIT - (now - lastCall)),
+    );
+  }
+
+  try {
+    const result = await spotifyPreviewFinder(trackName, 1);
+    const previewUrl = result.success
+      ? result.results[0]?.previewUrls[0]
+      : null;
+
+    if (previewUrl) {
+      previewFinderCache.set(trackName, previewUrl);
+      lastCall = Date.now();
     }
-    return null;
+
+    return previewUrl;
   } catch (error) {
-    console.error("Preview finder error:", error);
+    console.error(`Preview finder failed for ${trackName}:`, error);
     return null;
   }
+}
+
+export function getSpotifyEmbed(
+  trackId: string,
+  width: number = 400,
+  height: number = 400,
+): string {
+  console.log("This is the trackid: ", trackId);
+  return `
+<iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/${trackId}?utm_source=generator" width="${width}" height="${height}" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
+  `;
+}
+
+// Or if you need just the embed URL:
+export function getSpotifyEmbedUrl(trackId: string): string {
+  return `https://open.spotify.com/embed/track/${trackId}`;
 }

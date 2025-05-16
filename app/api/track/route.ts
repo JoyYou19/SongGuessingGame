@@ -1,6 +1,6 @@
 // /app/api/track/route.ts
-import { NextResponse } from "next/server";
 import { getRandomPreview } from "@/lib/spotify";
+import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
   try {
@@ -17,9 +17,21 @@ export async function GET(req: Request) {
     return NextResponse.json(track);
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Failed to fetch track" },
-      { status: 500 },
-    );
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Failed to fetch track";
+
+    if (
+      error instanceof Error &&
+      (error.message.includes("404") ||
+        error.message.includes("Resource not found"))
+    ) {
+      return NextResponse.json(
+        { error: "Playlist not found. Please check the playlist ID or URL." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
