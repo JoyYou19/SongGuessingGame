@@ -23,6 +23,7 @@ export default function SongGame() {
   const [errorMessage, setErrorMessage] = useState("");
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [didFail, setDidFail] = useState(false);
 
   const [loading, setLoading] = useState(false);
 
@@ -45,17 +46,24 @@ export default function SongGame() {
   const [skipStep, setSkipStep] = useState(0.4);
 
   const skipSeconds = () => {
+    if (seconds >= 30) {
+      setMessage("You failed! ❌");
+      setShowEmbed(true);
+      setDidFail(true);
+      return;
+    }
+
     setSeconds((prev) => {
       const nextSeconds = Math.min(prev + skipStep, 30);
       return nextSeconds;
     });
 
     setSkipStep((prevStep) => {
-      if (seconds < 0.5) return 0.5;
-      if (seconds < 1) return 2; // After 0.3 + 0.7, set to +1
-      if (seconds < 3) return 4;
-      if (seconds >= 7) return 15;
-      return prevStep * 2; // Double the step each time
+      if (seconds < 0.5) return 1.5;
+      if (seconds < 2) return 2;
+      if (seconds < 4) return 4;
+      if (seconds >= 8) return 16;
+      return prevStep * 2;
     });
   };
 
@@ -119,6 +127,7 @@ export default function SongGame() {
       setSeconds(0.1);
       setGuess("");
       setMessage("");
+      setDidFail(false);
       setIsPlaying(false);
       setSkipStep(0.4); // reset for new track
       setCurrentTime(0);
@@ -238,10 +247,21 @@ export default function SongGame() {
         <div className="flex flex-col items-center gap-6">
           <div dangerouslySetInnerHTML={{ __html: track.embedHtml }} />
           <div className="text-center w-full space-y-4">
-            <p className="text-2xl font-bold text-[#1DB954]">
-              Correct! +{10 - seconds} points
-            </p>
-            <p className="text-xl">Total Score: {score}</p>
+            {didFail ? (
+              <>
+                <p className="text-2xl font-bold text-red-400">
+                  You failed! ❌
+                </p>
+                <p className="text-xl text-gray-300">No points this round.</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-bold text-[#1DB954]">
+                  Correct! +{10 - seconds} points
+                </p>
+                <p className="text-xl">Total Score: {score}</p>
+              </>
+            )}
             <button
               onClick={() => {
                 setShowEmbed(false);
@@ -269,7 +289,7 @@ export default function SongGame() {
               />
 
               {/* Segment markers */}
-              {([0.1, 0.5, 1, 3, 7, 15] as const).map((time, index) => (
+              {([0.1, 0.5, 2, 4, 8, 16] as const).map((time, index) => (
                 <div
                   key={index}
                   className="absolute top-0 bottom-0 w-px bg-neutral-600 opacity-60"
@@ -332,7 +352,7 @@ export default function SongGame() {
                       onClick={skipSeconds}
                       className="text-[#1DB954] font-semibold text-lg px-4 py-2 border border-[#1DB954] rounded-md hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
                     >
-                      Skip +{skipStep}s
+                      {seconds >= 30 ? "Give Up" : `Skip +${skipStep}s`}
                     </button>
 
                     <button
