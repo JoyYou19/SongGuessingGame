@@ -165,7 +165,7 @@ export default function SongGame() {
   }, [seconds]);
 
   return (
-    <div className="w-1/2 mx-auto p-6 bg-neutral-900 rounded-lg shadow-lg text-gray-100 font-sans min-h-[600px]">
+    <div className="w-1/2 min-w-96 mx-auto p-6 bg-neutral-900 rounded-lg shadow-lg text-gray-100 font-sans min-h-[600px]">
       {/* Floating Playlist Button */}
       <div className="fixed bottom-6 right-6 z-50">
         {showPlaylistInput ? (
