@@ -113,11 +113,25 @@ export default function SongGame() {
     }
   };
 
+  const [clientId, setClientId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let existingId = localStorage.getItem("spotify-client-id");
+    if (!existingId) {
+      existingId = crypto.randomUUID();
+      localStorage.setItem("spotify-client-id", existingId);
+    }
+    setClientId(existingId);
+  }, []);
+
   const fetchTrack = async () => {
+    if (!clientId) return;
     setLoading(true);
     setErrorMessage("");
     try {
-      const res = await fetch(`/api/track?playlistId=${playlistId}`);
+      const res = await fetch(
+        `/api/track?clientId=${clientId}&playlistId=${playlistId}`,
+      );
       if (!res.ok) {
         const errorData = await res.json();
         throw new Error(errorData.error || "Failed to load track");
@@ -166,8 +180,10 @@ export default function SongGame() {
   }
 
   useEffect(() => {
-    fetchTrack();
-  }, []);
+    if (clientId) {
+      fetchTrack();
+    }
+  }, [clientId]);
 
   useEffect(() => {
     secondsRef.current = seconds;

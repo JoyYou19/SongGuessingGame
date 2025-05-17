@@ -13,7 +13,14 @@ export async function GET(req: Request) {
       throw new Error("Missing Spotify credentials");
     }
 
-    const track = await getRandomPreview(clientId, clientSecret, playlistId);
+    const clientIdFromQuery = searchParams.get("clientId") || "anonymous";
+
+    const track = await getRandomPreview(
+      clientId,
+      clientSecret,
+      playlistId,
+      clientIdFromQuery,
+    );
     return NextResponse.json(track);
   } catch (error) {
     console.error(error);

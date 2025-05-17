@@ -25,6 +25,8 @@ interface PlaylistCache {
 const playlistCache = new Map<string, PlaylistCache>();
 const CACHE_TTL = 5 * 60 * 1000;
 
+const clientTrackHistory = new Map<string, Set<string>>();
+
 let cachedToken: {
   token: string;
   expires: number;
@@ -77,6 +79,7 @@ async function fetchAllPlaylistTracks(
   url += `?${params}`;
 
   const allTracks: TrackSummary[] = [];
+  const seenTrackIds = new Set<string>();
 
   while (url) {
     const response = await fetch(url, {
@@ -90,7 +93,9 @@ async function fetchAllPlaylistTracks(
 
     const data: PlaylistTracksResponse = await response.json();
 
-    const tracks = data.items
+    //console.log(`Fetched ${data.items.length} items. Next: ${!!data.next}`);
+
+    const newTracks = data.items
       .map((item) => item.track)
       .filter((track): track is Track => track !== null)
       .map((track) => ({
@@ -100,9 +105,19 @@ async function fetchAllPlaylistTracks(
         previewUrl: track.preview_url,
       }));
 
-    allTracks.push(...tracks);
+    for (const track of newTracks) {
+      if (!seenTrackIds.has(track.id)) {
+        allTracks.push(track);
+        seenTrackIds.add(track.id);
+      } else {
+        //console.log(`Duplicate found and skipped: ${track.name} (${track.id})`);
+      }
+    }
+
     url = data.next || "";
   }
+  //
+  //console.log(`Total tracks fetched: ${allTracks.length}`);
 
   return allTracks;
 }
@@ -111,6 +126,7 @@ export async function getRandomPreview(
   clientId: string,
   clientSecret: string,
   playlistId: string = "37i9dQZF1DX4WYQ3aQLD4K",
+  userId: string = "anonymous",
 ): Promise<{
   previewUrl: string;
   name: string;
@@ -119,8 +135,6 @@ export async function getRandomPreview(
   allTracks: TrackSummary[];
   embedHtml: string;
 }> {
-  console.log(`Starting track fetch for playlist: ${playlistId}`);
-
   try {
     // Check cache first
     let cached = playlistCache.get(playlistId);
@@ -139,6 +153,18 @@ export async function getRandomPreview(
     const { tracks: allTracks } = cached;
     let attempts = 0;
     const MAX_ATTEMPTS = 5;
+
+    const songClientId = userId || "anonymous"; // Inject this into the function
+    const heardSet = clientTrackHistory.get(songClientId) || new Set<string>();
+
+    // Filter to unheard tracks
+    const unheardTracks = allTracks.filter((track) => !heardSet.has(track.id));
+
+    if (unheardTracks.length === 0) {
+      // If all tracks have been heard, reset the set
+      heardSet.clear();
+      unheardTracks.push(...allTracks);
+    }
 
     while (attempts < MAX_ATTEMPTS) {
       // Pick random track
@@ -167,6 +193,9 @@ export async function getRandomPreview(
       }
 
       if (previewUrl) {
+        heardSet.add(randomTrack.id);
+        clientTrackHistory.set(songClientId, heardSet);
+
         return {
           previewUrl,
           name: randomTrack.name,
@@ -273,7 +302,6 @@ export function getSpotifyEmbed(
   width: number = 400,
   height: number = 300,
 ): string {
-  console.log("This is the trackid: ", trackId);
   return `
 <iframe style="border-radius:12px" src="https://open.spotify.com/embed/track/${trackId}?utm_source=generator" width="${width}" height="${height}" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>
   `;
