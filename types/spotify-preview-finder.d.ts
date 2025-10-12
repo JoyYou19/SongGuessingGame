@@ -10,6 +10,7 @@ declare module "spotify-preview-finder" {
 
   export default function spotifyPreviewFinder(
     trackName: string,
+    artist?: string,
     limit?: number,
   ): Promise<PreviewFinderResult>;
 }

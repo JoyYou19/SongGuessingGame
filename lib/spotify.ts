@@ -189,7 +189,11 @@ export async function getRandomPreview(
       }
 
       if (!previewUrl) {
-        previewUrl = await getPreviewFromName(randomTrack.name);
+        console.log("Randomtrack artist: ", randomTrack.artist);
+        previewUrl = await getPreviewFromName(
+          randomTrack.name,
+          randomTrack.artist,
+        );
       }
 
       if (previewUrl) {
@@ -224,9 +228,15 @@ const RATE_LIMIT = 100; // 1 second between calls
 
 let lastCall = 0;
 
-async function getPreviewFromName(trackName: string): Promise<string | null> {
+async function getPreviewFromName(
+  trackName: string,
+  artist: string,
+): Promise<string | null> {
+  // Create a cache key that includes both name and artist for better accuracy
+  const cacheKey = artist ? `${trackName}::${artist}` : trackName;
+
   // Check cache first
-  const cached = previewFinderCache.get(trackName);
+  const cached = previewFinderCache.get(cacheKey);
   if (cached) return cached;
 
   // Rate limit
@@ -238,19 +248,21 @@ async function getPreviewFromName(trackName: string): Promise<string | null> {
   }
 
   try {
-    const result = await spotifyPreviewFinder(trackName, 1);
+    // Use enhanced search with artist when available
+    const result = await spotifyPreviewFinder(trackName, artist, 1); // Search with artist
+
     const previewUrl = result.success
       ? result.results[0]?.previewUrls[0]
       : null;
 
     if (previewUrl) {
-      previewFinderCache.set(trackName, previewUrl);
+      previewFinderCache.set(cacheKey, previewUrl);
       lastCall = Date.now();
     }
 
     return previewUrl;
   } catch (error) {
-    console.error(`Preview finder failed for ${trackName}:`, error);
+    console.error(`Preview finder failed for ${cacheKey}:`, error);
     return null;
   }
 }
