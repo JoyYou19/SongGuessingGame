@@ -311,7 +311,7 @@ async function getPreviewFromTrackUrl(trackId: string): Promise<string | null> {
 
 export function getSpotifyEmbed(
   trackId: string,
-  width: number = 400,
+  width: string = "100%",
   height: number = 300,
 ): string {
   return `

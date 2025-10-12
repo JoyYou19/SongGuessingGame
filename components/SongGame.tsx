@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Combobox } from "@headlessui/react";
 import { FaPlay, FaRedo } from "react-icons/fa";
 import { MdCheckCircle, MdError } from "react-icons/md";
 import { FaEdit } from "react-icons/fa";
+import { SongPicker } from "./SongPicker";
 
 export default function SongGame() {
   const [track, setTrack] = useState<{
@@ -159,10 +159,13 @@ export default function SongGame() {
     }
   };
 
-  const checkGuess = () => {
+  const checkGuess = (selected?: string) => {
     if (!track) return;
 
-    if (guess.toLowerCase() === track.name.toLowerCase()) {
+    // prefer passed-in selection, fall back to state 'guess'
+    const guessToCheck = selected ?? guess;
+
+    if (guessToCheck.trim().toLowerCase() === track.name.toLowerCase()) {
       setScore((s) => s + (10 - seconds));
       setMessage("Correct! 🎉");
       setShowEmbed(true);
@@ -190,31 +193,51 @@ export default function SongGame() {
   }, [seconds]);
 
   return (
-    <div className="w-1/2 min-w-96 mx-auto p-6 bg-neutral-900 rounded-lg shadow-lg text-gray-100 font-sans min-h-[600px]">
+    <div className="sm:w-1/2 w-full mx-auto p-6 bg-neutral-900 rounded-2xl shadow-lg text-gray-100 font-sans min-h-[600px]">
       {/* Floating Playlist Button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         {showPlaylistInput ? (
-          <div className="flex flex-col items-end gap-2">
-            <input
-              value={rawPlaylistInput}
-              onChange={(e) => setRawPlaylistInput(e.target.value)}
-              placeholder="Paste Spotify link or ID"
-              className="px-4 py-2 rounded-md bg-neutral-800 text-white border border-neutral-700 focus:ring-2 focus:ring-[#1DB954] outline-none w-96"
-            />
-            <button
-              onClick={() => setShowPlaylistInput(false)}
-              className="bg-[#1DB954] text-neutral-900 font-semibold px-4 py-2 rounded-md hover:bg-[#1ed760] transition"
-            >
-              Done
-            </button>
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div className="bg-neutral-800 rounded-xl p-6 w-full max-w-md mx-auto shadow-2xl">
+              <h3 className="text-xl font-bold text-white mb-4 text-center">
+                Set Playlist
+              </h3>
+              <input
+                value={rawPlaylistInput}
+                onChange={(e) => setRawPlaylistInput(e.target.value)}
+                placeholder="Paste Spotify playlist link or ID"
+                className="w-full px-4 py-3 rounded-lg bg-neutral-700 text-white  focus:ring-2 focus:ring-[#1DB954] focus:border-transparent outline-none text-base mb-4"
+                autoFocus
+              />
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowPlaylistInput(false)}
+                  className="flex-1 px-4 py-3 rounded-lg bg-neutral-600 text-white font-semibold hover:bg-neutral-500 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPlaylistInput(false);
+                    fetchTrack(); // Refresh with new playlist
+                  }}
+                  className="flex-1 px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-lg hover:bg-[#1ed760] transition"
+                >
+                  Save
+                </button>
+              </div>
+              <p className="text-xs text-neutral-400 mt-3 text-center">
+                Paste a Spotify playlist URL or ID
+              </p>
+            </div>
           </div>
         ) : (
           <button
             onClick={() => setShowPlaylistInput(true)}
-            className="w-12 h-12 rounded-full bg-[#1DB954] text-neutral-900 flex items-center justify-center shadow-lg hover:bg-[#1ed760] transition"
+            className="w-14 h-14 rounded-full bg-[#1DB954] text-neutral-900 flex items-center justify-center shadow-lg hover:bg-[#1ed760] transition active:scale-95"
             title="Set Playlist ID"
           >
-            <FaEdit size={20} />
+            <FaEdit size={24} className="sm:w-5 sm:h-5" />
           </button>
         )}
       </div>
@@ -253,7 +276,7 @@ export default function SongGame() {
               setErrorMessage("");
               fetchTrack();
             }}
-            className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-md hover:bg-[#1ed760] transition"
+            className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-lg hover:bg-[#1ed760] transition"
           >
             Try Again
           </button>
@@ -261,7 +284,13 @@ export default function SongGame() {
       ) : showEmbed && track ? (
         // New embed display section
         <div className="flex flex-col items-center gap-6">
-          <div dangerouslySetInnerHTML={{ __html: track.embedHtml }} />
+          {/* Responsive embed container */}
+          <div className="w-full mx-auto">
+            <div
+              className="spotify-embed-mobile"
+              dangerouslySetInnerHTML={{ __html: track.embedHtml }}
+            />
+          </div>
           <div className="text-center w-full space-y-4">
             {didFail ? (
               <>
@@ -283,7 +312,7 @@ export default function SongGame() {
                 setShowEmbed(false);
                 fetchTrack();
               }}
-              className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-md hover:bg-[#1ed760] transition flex items-center gap-2 mx-auto"
+              className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-lg hover:bg-[#1ed760] transition flex items-center gap-2 mx-auto"
             >
               <FaPlay /> Next Song
             </button>
@@ -343,65 +372,17 @@ export default function SongGame() {
               </button>
             </div>
 
-            {/* Dark themed Combobox */}
-            <Combobox value={guess} onChange={(val) => setGuess(val ?? "")}>
-              <div className="relative">
-                <div className="flex-col space-y-2">
-                  <Combobox.Input
-                    className="flex-1 px-4 py-3 rounded-md border border-neutral-700 bg-neutral-800 text-white text-lg font-medium outline-none focus:ring-2 focus:ring-[#1DB954]"
-                    onChange={(e) => {
-                      setQuery(e.target.value);
-                      setGuess(e.target.value);
-                    }}
-                    placeholder="Guess the song..."
-                    autoComplete="off"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        checkGuess();
-                        e.preventDefault();
-                      }
-                    }}
-                  />
-
-                  <div className="flex items-center justify-between w-full gap-4">
-                    <button
-                      onClick={skipSeconds}
-                      className="text-[#1DB954] font-semibold text-lg px-4 py-2 border border-[#1DB954] rounded-md hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
-                    >
-                      {seconds >= 30 ? "Give Up" : `Skip +${skipStep}s`}
-                    </button>
-
-                    <button
-                      onClick={checkGuess}
-                      className="px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-md hover:bg-[#1ed760] active:bg-[#17c54d] transition-colors"
-                    >
-                      Guess
-                    </button>
-                  </div>
-                </div>
-                <Combobox.Options className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border border-neutral-700 bg-neutral-800 shadow-lg text-white">
-                  {filteredTracks.length === 0 && query !== "" ? (
-                    <div className="p-4 text-neutral-500">No songs found.</div>
-                  ) : (
-                    filteredTracks.map(({ name, artist }, index) => (
-                      <Combobox.Option
-                        key={`${name}-${index}`}
-                        value={name}
-                        className={({ active }) =>
-                          `cursor-pointer select-none px-4 py-2 ${
-                            active
-                              ? "bg-[#1DB954] text-neutral-900"
-                              : "text-white"
-                          }`
-                        }
-                      >
-                        {name} — {artist}
-                      </Combobox.Option>
-                    ))
-                  )}
-                </Combobox.Options>
-              </div>
-            </Combobox>
+            <SongPicker
+              guess={guess}
+              setGuess={setGuess}
+              filteredTracks={filteredTracks}
+              query={query}
+              setQuery={setQuery}
+              checkGuess={checkGuess}
+              skipSeconds={skipSeconds}
+              seconds={seconds}
+              skipStep={skipStep}
+            />
 
             {/* Message */}
             <div
@@ -425,7 +406,7 @@ export default function SongGame() {
 
             <button
               onClick={fetchTrack}
-              className="flex items-center justify-center gap-2 bg-neutral-700 hover:bg-neutral-800 transition-colors text-white text-lg font-semibold px-6 py-3 rounded-md shadow-md mb-6 "
+              className="flex items-center justify-center gap-2 bg-neutral-700 hover:bg-neutral-800 transition-colors text-white text-lg font-semibold px-6 py-3 rounded-lg shadow-md mb-6 "
             >
               <FaRedo size={18} />
               New Song
