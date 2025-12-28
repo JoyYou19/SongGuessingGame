@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #0f172a;
   --foreground: #171717;
 }
 
@@ -19,8 +19,42 @@
   }
 }
 
+/* globals.css */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: none;
+}
+
+button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* globals.css */
+.progress-glow {
+  box-shadow: 0 0 20px rgba(29, 185, 84, 0.45);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+
+  min-height: 100vh;
+  min-height: 100dvh;
+
+  overflow: hidden; /* 🚫 No page scroll */
+
+  background-color: #171717;
+  background-image: radial-gradient(
+    ellipse at 50% 30%,
+    rgba(29, 185, 84, 0.08) 0%,
+    transparent 70%
+  );
 }

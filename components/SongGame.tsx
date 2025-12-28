@@ -5,6 +5,9 @@ import { FaPlay, FaRedo } from "react-icons/fa";
 import { MdCheckCircle, MdError } from "react-icons/md";
 import { FaEdit } from "react-icons/fa";
 import { SongPicker } from "./SongPicker";
+import LoadingPulse from "./LoadingPulse";
+import gsap from "gsap";
+import { usePressAnimation } from "./usePressAnimation";
 
 export default function SongGame() {
   const [track, setTrack] = useState<{
@@ -25,12 +28,24 @@ export default function SongGame() {
   const [currentTime, setCurrentTime] = useState(0);
   const [didFail, setDidFail] = useState(false);
 
+  const progressRef = useRef<HTMLDivElement | null>(null);
+  const markerRef = useRef<HTMLDivElement | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   const [playlistId, setPlaylistId] = useState("0XlOyEhV3svED5bXnbimkh");
   const [rawPlaylistInput, setRawPlaylistInput] = useState(
     "0XlOyEhV3svED5bXnbimkh",
   );
+
+  const playRef = useRef<HTMLButtonElement>(null);
+  const press = usePressAnimation(playRef);
+
+  const newSongRef = useRef<HTMLButtonElement>(null);
+  const newSongPress = usePressAnimation(newSongRef);
+
+  const nextSongRef = useRef<HTMLButtonElement>(null);
+  const nextSongPress = usePressAnimation(nextSongRef);
 
   useEffect(() => {
     const extractedId = extractPlaylistId(rawPlaylistInput);
@@ -65,6 +80,18 @@ export default function SongGame() {
       if (seconds >= 8) return 16;
       return prevStep * 2;
     });
+
+    gsap.fromTo(
+      progressRef.current,
+      { scaleY: 1 },
+      {
+        scaleY: 1.3,
+        duration: 0.12,
+        yoyo: true,
+        repeat: 1,
+        ease: "power2.out",
+      },
+    );
   };
 
   // Filter options based on query
@@ -115,10 +142,23 @@ export default function SongGame() {
 
   const [clientId, setClientId] = useState<string | null>(null);
 
+  function generateUUID() {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+
+    // Fallback for older iOS Safari
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
   useEffect(() => {
     let existingId = localStorage.getItem("spotify-client-id");
     if (!existingId) {
-      existingId = crypto.randomUUID();
+      existingId = generateUUID();
       localStorage.setItem("spotify-client-id", existingId);
     }
     setClientId(existingId);
@@ -128,6 +168,9 @@ export default function SongGame() {
     if (!clientId) return;
     setLoading(true);
     setErrorMessage("");
+
+    gsap.set(progressRef.current, { width: "0%" });
+    gsap.set(markerRef.current, { left: "0%" });
     try {
       const res = await fetch(
         `/api/track?clientId=${clientId}&playlistId=${playlistId}`,
@@ -192,27 +235,54 @@ export default function SongGame() {
     secondsRef.current = seconds;
   }, [seconds]);
 
+  useEffect(() => {
+    if (!progressRef.current) return;
+
+    const percent = Math.min((seconds / 30) * 100, 100);
+
+    gsap.to(progressRef.current, {
+      width: `${percent}%`,
+      duration: 0.35,
+      ease: "expo.out",
+    });
+  }, [seconds]);
+
+  useEffect(() => {
+    if (!markerRef.current) return;
+
+    const percent = Math.min((currentTime / 30) * 100, 100);
+
+    gsap.to(markerRef.current, {
+      left: `${percent}%`,
+      duration: 0.1,
+      ease: "linear",
+    });
+  }, [currentTime]);
+
   return (
-    <div className="sm:w-1/2 w-full mx-auto p-6 bg-neutral-900 rounded-2xl shadow-lg text-gray-100 font-sans min-h-[600px]">
+    <div className="sm:w-1/2 w-full mx-auto p-6 bg-neutral-900 rounded-3xl sm:shadow-lg text-gray-100 font-sans min-h-[600px]">
       {/* Floating Playlist Button */}
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         {showPlaylistInput ? (
           <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
-            <div className="bg-neutral-800 rounded-xl p-6 w-full max-w-md mx-auto shadow-2xl">
-              <h3 className="text-xl font-bold text-white mb-4 text-center">
+            <div className="bg-neutral-800 rounded-3xl p-6 w-full max-w-md mx-auto shadow-2xl">
+              <h3 className="text-xl font-bold text-white mb-2 text-center">
                 Set Playlist
               </h3>
+              <p className="text-xs text-neutral-400 mb-3 text-center">
+                Paste a Spotify playlist URL or ID
+              </p>
               <input
                 value={rawPlaylistInput}
                 onChange={(e) => setRawPlaylistInput(e.target.value)}
                 placeholder="Paste Spotify playlist link or ID"
-                className="w-full px-4 py-3 rounded-lg bg-neutral-700 text-white  focus:ring-2 focus:ring-[#1DB954] focus:border-transparent outline-none text-base mb-4"
+                className="w-full px-4 py-3 rounded-xl bg-neutral-700 text-white  focus:ring-2 focus:ring-[#1DB954] focus:border-transparent outline-none text-base mb-4"
                 autoFocus
               />
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowPlaylistInput(false)}
-                  className="flex-1 px-4 py-3 rounded-lg bg-neutral-600 text-white font-semibold hover:bg-neutral-500 transition"
+                  className="flex-1 px-4 py-3 rounded-xl bg-neutral-600 text-white font-semibold hover:bg-neutral-500 transition"
                 >
                   Cancel
                 </button>
@@ -221,14 +291,11 @@ export default function SongGame() {
                     setShowPlaylistInput(false);
                     fetchTrack(); // Refresh with new playlist
                   }}
-                  className="flex-1 px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-lg hover:bg-[#1ed760] transition"
+                  className="flex-1 px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-xl hover:bg-[#1ed760] transition"
                 >
                   Save
                 </button>
               </div>
-              <p className="text-xs text-neutral-400 mt-3 text-center">
-                Paste a Spotify playlist URL or ID
-              </p>
             </div>
           </div>
         ) : (
@@ -243,25 +310,11 @@ export default function SongGame() {
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[300px]">
-          {/* Minimalist loading animation with Spotify/Epic Games aesthetic */}
-          <div className="flex space-x-2 mb-4">
-            <div
-              className="w-3 h-3 bg-[#1DB954] rounded-full animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="w-3 h-3 bg-[#1DB954] rounded-full animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <div
-              className="w-3 h-3 bg-[#1DB954] rounded-full animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
-          </div>
-          <div className="text-sm font-medium text-gray-400 tracking-wider">
-            LOADING
-          </div>
+        <div className="flex flex-col items-center justify-center min-h-[300px] gap-6">
+          <LoadingPulse />
+          <p className="text-xs uppercase tracking-[0.3em] text-neutral-400">
+            Loading track
+          </p>
         </div>
       ) : errorMessage ? (
         // Error view
@@ -294,9 +347,7 @@ export default function SongGame() {
           <div className="text-center w-full space-y-4">
             {didFail ? (
               <>
-                <p className="text-2xl font-bold text-red-400">
-                  You failed! ❌
-                </p>
+                <p className="text-2xl font-bold text-red-400">You failed!</p>
                 <p className="text-xl text-gray-300">No points this round.</p>
               </>
             ) : (
@@ -308,11 +359,13 @@ export default function SongGame() {
               </>
             )}
             <button
+              ref={nextSongRef}
+              {...nextSongPress}
               onClick={() => {
                 setShowEmbed(false);
                 fetchTrack();
               }}
-              className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-lg hover:bg-[#1ed760] transition flex items-center gap-2 mx-auto"
+              className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-xl hover:bg-[#1ed760] transition flex items-center gap-2 mx-auto"
             >
               <FaPlay /> Next Song
             </button>
@@ -324,28 +377,28 @@ export default function SongGame() {
             {/* Hidden audio element */}
             <audio ref={audioRef} src={track.previewUrl} preload="auto" />
 
-            <div className="relative w-full bg-neutral-800 rounded-full h-4 overflow-hidden shadow-inner">
-              {/* Green progress fill */}
-              <div
-                className="h-full bg-[#1DB954] transition-all duration-300"
-                style={{
-                  width: `${Math.min((seconds / 30) * 100, 100)}%`,
-                }}
-              />
-
+            <div className="relative w-full h-4 rounded-full bg-neutral-700/60 overflow-hidden">
               {/* Segment markers */}
               {([0.1, 0.5, 2, 4, 8, 16] as const).map((time, index) => (
                 <div
                   key={index}
-                  className="absolute top-0 bottom-0 w-px bg-neutral-600 opacity-60"
+                  className="absolute top-0 bottom-0 w-px bg-neutral-500/50 pointer-events-none"
                   style={{ left: `${(time / 30) * 100}%` }}
                 />
               ))}
 
-              {/* White playback marker */}
+              {/* Progress fill */}
               <div
-                className="absolute top-0 bottom-0 w-[2px] bg-white"
-                style={{ left: `${(currentTime / 30) * 100}%` }}
+                ref={progressRef}
+                className="absolute inset-y-0 left-0 bg-[#1DB954] rounded-l-full"
+                style={{ width: "0%" }}
+              />
+
+              {/* Playback marker */}
+              <div
+                ref={markerRef}
+                className="absolute top-[-6px] w-[2px] h-6 bg-white/90 pointer-events-none"
+                style={{ left: "0%" }}
               />
             </div>
             <p className="text-sm text-neutral-500 text-center w-full">
@@ -356,11 +409,13 @@ export default function SongGame() {
             <div className="relative group w-20 h-20">
               {/* Hover Glow */}
               {!isPlaying && (
-                <div className="absolute inset-0 rounded-full bg-[#1DB954] blur-lg opacity-0 group-hover:opacity-20 transition-opacity duration-300 pointer-events-none z-0 scale-[1.1]" />
+                <div className="absolute inset-0 rounded-full bg-[#1DB954] blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-300 pointer-events-none z-0 scale-[1.1]" />
               )}
 
               {/* Play Button */}
               <button
+                ref={playRef}
+                {...press}
                 onClick={playSnippet}
                 disabled={isPlaying}
                 aria-label={`Play ${seconds} second${seconds > 1 ? "s" : ""}`}
@@ -405,8 +460,10 @@ export default function SongGame() {
             </p>
 
             <button
+              ref={newSongRef}
+              {...newSongPress}
               onClick={fetchTrack}
-              className="flex items-center justify-center gap-2 bg-neutral-700 hover:bg-neutral-800 transition-colors text-white text-lg font-semibold px-6 py-3 rounded-lg shadow-md mb-6 "
+              className="flex items-center justify-center gap-2 bg-neutral-700 hover:bg-neutral-800 transition-colors text-white text-lg font-semibold px-6 py-3 rounded-xl shadow-md mb-6 "
             >
               <FaRedo size={18} />
               New Song

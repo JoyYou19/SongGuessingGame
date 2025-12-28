@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useIsMobile } from "./useIsMobile";
 import { Combobox } from "@headlessui/react";
+import { usePressAnimation } from "./usePressAnimation";
 
 // Define the structure of a track
 export interface Track {
@@ -55,6 +56,12 @@ function MobileSongPicker({
 }) {
   const [open, setOpen] = useState(false);
 
+  const skipSongRef = useRef<HTMLButtonElement>(null);
+  const skipSongPress = usePressAnimation(skipSongRef);
+
+  const guessSongRef = useRef<HTMLButtonElement>(null);
+  const guessSongPress = usePressAnimation(guessSongRef);
+
   return (
     <>
       {/* Main collapsed state */}
@@ -62,7 +69,7 @@ function MobileSongPicker({
         <div className="w-full flex flex-col space-y-3">
           <button
             onClick={() => setOpen(true)}
-            className="w-full bg-neutral-800 py-3 rounded-lg text-center text-gray-300"
+            className="w-full bg-neutral-800 py-3 rounded-xl text-center text-gray-300"
           >
             {guess || "Tap to guess..."}
           </button>
@@ -70,15 +77,19 @@ function MobileSongPicker({
           {/* Controls same as Desktop */}
           <div className="flex items-center justify-between mt-4 w-full gap-4">
             <button
+              ref={skipSongRef}
+              {...skipSongPress}
               onClick={skipSeconds}
-              className="text-[#1DB954] font-semibold text-lg px-4 py-2 border border-[#1DB954] rounded-lg hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
+              className="text-[#1DB954] font-semibold text-lg px-4 py-2 border-2 border-[#1DB954] rounded-xl hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
             >
               {seconds >= 30 ? "Give Up" : `Skip +${skipStep}s`}
             </button>
 
             <button
+              ref={guessSongRef}
+              {...guessSongPress}
               onClick={() => checkGuess()}
-              className="px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-lg hover:bg-[#1ed760] active:bg-[#17c54d] transition-colors"
+              className="px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-xl hover:bg-[#1ed760] active:bg-[#17c54d] transition-colors"
             >
               Guess
             </button>
@@ -88,14 +99,14 @@ function MobileSongPicker({
 
       {/* Full-screen picker */}
       {open && (
-        <div className="fixed inset-0 bg-neutral-900 z-50 flex flex-col p-6">
+        <div className="fixed inset-0 bg-neutral-900 h-full z-50 flex flex-col p-6">
           <input
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               setGuess(e.target.value);
             }}
-            className="px-4 py-3 rounded-lg border border-neutral-700 bg-neutral-800 text-white mb-4"
+            className="px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-800 text-white mb-4"
             placeholder="Search song..."
             autoFocus
           />
@@ -119,7 +130,7 @@ function MobileSongPicker({
 
           <button
             onClick={() => setOpen(false)}
-            className="mt-4 py-3 text-center bg-neutral-700 rounded-lg"
+            className="mt-4 py-3 text-center bg-neutral-700 rounded-xl"
           >
             Cancel
           </button>
@@ -140,12 +151,15 @@ function DesktopSongPicker({
   seconds,
   skipStep,
 }: DesktopSongPickerProps) {
+  const skipSongRef = useRef<HTMLButtonElement>(null);
+  const skipSongPress = usePressAnimation(skipSongRef);
+
   return (
     <Combobox value={guess} onChange={(val: string) => setGuess(val ?? "")}>
       <div className="relative">
         <div className="flex-col space-y-2">
           <Combobox.Input
-            className="flex-1 px-4 py-3 rounded-lg border border-neutral-700 bg-neutral-800 text-white text-lg font-medium outline-none focus:ring-2 focus:ring-[#1DB954]"
+            className="flex-1 px-4 py-3 rounded-xl border border-neutral-700 bg-neutral-800 text-white text-lg font-medium outline-none focus:ring-2 focus:ring-[#1DB954]"
             onChange={(e) => {
               setQuery(e.target.value);
               setGuess(e.target.value);
@@ -162,22 +176,24 @@ function DesktopSongPicker({
 
           <div className="flex items-center justify-between w-full gap-4">
             <button
+              ref={skipSongRef}
+              {...skipSongPress}
               onClick={skipSeconds}
-              className="text-[#1DB954] font-semibold text-lg px-4 py-2 border border-[#1DB954] rounded-lg hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
+              className="text-[#1DB954] font-semibold text-lg px-4 py-2 border-2 border-[#1DB954] rounded-xl hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
             >
               {seconds >= 30 ? "Give Up" : `Skip +${skipStep}s`}
             </button>
 
             <button
               onClick={() => checkGuess()}
-              className="px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-lg hover:bg-[#1ed760] active:bg-[#17c54d] transition-colors"
+              className="px-4 py-3 bg-[#1DB954] text-neutral-900 font-semibold rounded-xl hover:bg-[#1ed760] active:bg-[#17c54d] transition-colors"
             >
               Guess
             </button>
           </div>
         </div>
 
-        <Combobox.Options className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-neutral-700 bg-neutral-800 shadow-lg text-white">
+        <Combobox.Options className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-xl border border-neutral-700 bg-neutral-800 shadow-lg text-white">
           {filteredTracks.length === 0 && query !== "" ? (
             <div className="p-4 text-neutral-500">No songs found.</div>
           ) : (
