@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Song guessing game",
-  description: "Spotify playlist song randomizer",
+  title: "Spotabl — Spot the Song in Seconds",
+  description:
+    "Paste a Spotify playlist and challenge yourself to spot songs from milliseconds of audio. Faster guesses earn more points.",
 };
 
 export default function RootLayout({
