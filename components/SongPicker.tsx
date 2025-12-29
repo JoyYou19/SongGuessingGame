@@ -80,7 +80,7 @@ function MobileSongPicker({
               ref={skipSongRef}
               {...skipSongPress}
               onClick={skipSeconds}
-              className="text-[#1DB954] font-semibold text-lg px-4 py-2 border-2 border-[#1DB954] rounded-xl hover:bg-[#1DB954] hover:text-neutral-900 transition-colors select-none"
+              className="text-[#1DB954] font-semibold text-lg px-4 py-2 border-2 border-[#1DB954] rounded-xl active:bg-[#1DB954] active:text-neutral-900 transition-colors select-none"
             >
               {seconds >= 30 ? "Give Up" : `Skip +${skipStep}s`}
             </button>

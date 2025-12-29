@@ -1,4 +1,3 @@
-// /app/api/track/route.ts
 import { getRandomPreview } from "@/lib/spotify";
 import { NextResponse } from "next/server";
 

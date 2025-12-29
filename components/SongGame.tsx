@@ -9,7 +9,11 @@ import LoadingPulse from "./LoadingPulse";
 import gsap from "gsap";
 import { usePressAnimation } from "./usePressAnimation";
 
-export default function SongGame() {
+export default function SongGame({
+  initialPlaylist,
+}: {
+  initialPlaylist?: string;
+}) {
   const [track, setTrack] = useState<{
     previewUrl: string;
     name: string;
@@ -33,9 +37,14 @@ export default function SongGame() {
 
   const [loading, setLoading] = useState(false);
 
-  const [playlistId, setPlaylistId] = useState("0XlOyEhV3svED5bXnbimkh");
+  const DEFAULT_PLAYLIST = "0XlOyEhV3svED5bXnbimkh";
+
   const [rawPlaylistInput, setRawPlaylistInput] = useState(
-    "0XlOyEhV3svED5bXnbimkh",
+    initialPlaylist || DEFAULT_PLAYLIST,
+  );
+
+  const [playlistId, setPlaylistId] = useState(
+    initialPlaylist || DEFAULT_PLAYLIST,
   );
 
   const playRef = useRef<HTMLButtonElement>(null);
@@ -260,7 +269,7 @@ export default function SongGame() {
   }, [currentTime]);
 
   return (
-    <div className="sm:w-1/2 w-full mx-auto p-6 bg-neutral-900 rounded-3xl sm:shadow-lg text-gray-100 font-sans min-h-[600px]">
+    <div className="lg:w-1/2 w-full mx-auto p-6 bg-neutral-900 rounded-3xl sm:shadow-lg text-gray-100 font-sans min-h-[600px]">
       {/* Floating Playlist Button */}
       <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50">
         {showPlaylistInput ? (
