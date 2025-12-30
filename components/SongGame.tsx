@@ -4,10 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { FaPlay, FaRedo } from "react-icons/fa";
 import { MdCheckCircle, MdError } from "react-icons/md";
 import { FaEdit } from "react-icons/fa";
+import { FaFire } from "react-icons/fa";
 import { SongPicker } from "./SongPicker";
 import LoadingPulse from "./LoadingPulse";
 import gsap from "gsap";
 import { usePressAnimation } from "./usePressAnimation";
+import ResultEmbed from "./ResultEmbed";
+
+function scoreFromSeconds(seconds: number) {
+  if (seconds <= 0.5) return { points: 100, tier: "perfect", dots: 6 };
+  if (seconds <= 2) return { points: 80, tier: "great", dots: 5 };
+  if (seconds <= 4) return { points: 60, tier: "good", dots: 4 };
+  if (seconds <= 8) return { points: 40, tier: "close", dots: 3 };
+  if (seconds <= 16) return { points: 20, tier: "barely", dots: 2 };
+  return { points: 0, tier: "fail", dots: 0 };
+}
 
 export default function SongGame({
   initialPlaylist,
@@ -37,7 +48,12 @@ export default function SongGame({
 
   const [loading, setLoading] = useState(false);
 
-  const DEFAULT_PLAYLIST = "0XlOyEhV3svED5bXnbimkh";
+  const DEFAULT_PLAYLIST = "7EnIitpBIDp8hbqoaOWfQO";
+
+  const [streak, setStreak] = useState(0);
+  const [streakHistory, setStreakHistory] = useState<
+    { tier: string; points: number; dots: number }[]
+  >([]);
 
   const [rawPlaylistInput, setRawPlaylistInput] = useState(
     initialPlaylist || DEFAULT_PLAYLIST,
@@ -211,6 +227,20 @@ export default function SongGame({
     }
   };
 
+  const fireColorByTier: Record<string, string> = {
+    perfect: "text-fuchsia-400 drop-shadow-[0_0_10px_rgba(232,121,249,1)]",
+
+    amazing: "text-violet-400 drop-shadow-[0_0_10px_rgba(167,139,250,1)]",
+
+    great: "text-indigo-400 drop-shadow-[0_0_10px_rgba(129,140,248,1)]",
+
+    good: "text-blue-400 drop-shadow-[0_0_10px_rgba(96,165,250,1)]",
+
+    close: "text-cyan-400 drop-shadow-[0_0_10px_rgba(34,211,238,1)]",
+
+    barely: "text-emerald-400 drop-shadow-[0_0_10px_rgba(52,211,153,0.95)]",
+  };
+
   const checkGuess = (selected?: string) => {
     if (!track) return;
 
@@ -218,14 +248,45 @@ export default function SongGame({
     const guessToCheck = selected ?? guess;
 
     if (guessToCheck.trim().toLowerCase() === track.name.toLowerCase()) {
-      setScore((s) => s + (10 - seconds));
+      const result = scoreFromSeconds(seconds);
+
+      setScore((s) => s + result.points);
+      setStreak((s) => s + 1);
+
+      setStreakHistory((prev) => [
+        ...prev,
+        {
+          tier: result.tier,
+          points: result.points,
+          dots: result.dots,
+        },
+      ]);
       setMessage("Correct! 🎉");
       setShowEmbed(true);
     } else {
+      setStreak(0);
+      setStreakHistory([]);
       skipSeconds();
       setMessage("Try again!");
     }
   };
+
+  function AttemptDots({ filled }: { filled: number }) {
+    const TOTAL = 6;
+
+    return (
+      <div className="flex justify-center gap-1 mt-1">
+        {Array.from({ length: TOTAL }).map((_, i) => (
+          <span
+            key={i}
+            className={`w-2 h-2 rounded-full ${
+              i < filled ? "bg-[#1DB954]" : "bg-neutral-700"
+            }`}
+          />
+        ))}
+      </div>
+    );
+  }
 
   function extractPlaylistId(input: string): string | null {
     const match = input.match(
@@ -267,6 +328,16 @@ export default function SongGame({
       ease: "linear",
     });
   }, [currentTime]);
+
+  useEffect(() => {
+    if (showEmbed && !didFail) {
+      gsap.fromTo(
+        ".streak-fire",
+        { scale: 0, opacity: 0 },
+        { scale: 1, opacity: 1, stagger: 0.05, ease: "back.out(1.7)" },
+      );
+    }
+  }, [streakHistory, showEmbed, didFail]);
 
   return (
     <div className="lg:w-1/2 w-full mx-auto p-6 bg-neutral-900 rounded-3xl sm:shadow-lg text-gray-100 font-sans min-h-[600px]">
@@ -344,42 +415,20 @@ export default function SongGame({
           </button>
         </div>
       ) : showEmbed && track ? (
-        // New embed display section
-        <div className="flex flex-col items-center gap-6">
-          {/* Responsive embed container */}
-          <div className="w-full mx-auto">
-            <div
-              className="spotify-embed-mobile"
-              dangerouslySetInnerHTML={{ __html: track.embedHtml }}
-            />
-          </div>
-          <div className="text-center w-full space-y-4">
-            {didFail ? (
-              <>
-                <p className="text-2xl font-bold text-red-400">You failed!</p>
-                <p className="text-xl text-gray-300">No points this round.</p>
-              </>
-            ) : (
-              <>
-                <p className="text-2xl font-bold text-[#1DB954]">
-                  Correct! +{10 - seconds} points
-                </p>
-                <p className="text-xl">Total Score: {score}</p>
-              </>
-            )}
-            <button
-              ref={nextSongRef}
-              {...nextSongPress}
-              onClick={() => {
-                setShowEmbed(false);
-                fetchTrack();
-              }}
-              className="bg-[#1DB954] text-neutral-900 font-semibold px-6 py-3 rounded-xl hover:bg-[#1ed760] transition flex items-center gap-2 mx-auto"
-            >
-              <FaPlay /> Next Song
-            </button>
-          </div>
-        </div>
+        <ResultEmbed
+          track={track}
+          didFail={didFail}
+          streakHistory={streakHistory}
+          score={score}
+          fireColorByTier={fireColorByTier}
+          AttemptDots={AttemptDots}
+          nextSongRef={nextSongRef}
+          nextSongPress={nextSongPress}
+          onNext={() => {
+            setShowEmbed(false);
+            fetchTrack();
+          }}
+        />
       ) : (
         track && (
           <div className="space-y-8 flex flex-col items-center">
@@ -464,8 +513,11 @@ export default function SongGame({
             </div>
 
             {/* Score */}
-            <p className="text-center text-neutral-400 text-lg font-semibold">
-              Score: {score}
+            <p className="text-2xl font-semibold text-neutral-100">
+              {score}
+              <span className="ml-1 text-sm font-medium text-neutral-400">
+                pts
+              </span>
             </p>
 
             <button
